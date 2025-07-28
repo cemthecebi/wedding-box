@@ -1,0 +1,49 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Firebase config
+firebase-config.json
+firebase-service-account.json
+
+# Uploads (git'e dahil edilmemeli)
+/uploads/
+/public/uploads/
+
+# Logs
+/logs/
+*.log
+
+# Cache
+/cache/
+/tmp/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Composer
+composer.lock
+
+# PHP
+*.php~
+*.php.bak
+
+# Testing
+/coverage/
+.phpunit.result.cache
+
+# Build files
+/build/
+/dist/ 

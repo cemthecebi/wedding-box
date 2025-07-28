@@ -1,0 +1,21 @@
+RewriteEngine On
+
+# Tüm istekleri index.php'ye yönlendir
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Güvenlik - PHP dosyalarına doğrudan erişimi engelle
+<Files "*.php">
+    Order allow,deny
+    Allow from all
+</Files>
+
+# CORS ayarları
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+
+# OPTIONS isteklerini handle et
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=200,L] 
