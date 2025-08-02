@@ -6,7 +6,7 @@
             <div class="card shadow-sm">
                 <div class="card-body p-5">
                     <div class="text-center mb-4">
-                        <h2 class="fw-bold text-primary">
+                        <h2 class="fw-bold">
                             <i class="fas fa-camera"></i> Fotoğraf/Video Yükle
                         </h2>
                         <p class="text-muted"><?= htmlspecialchars($event['name']) ?></p>

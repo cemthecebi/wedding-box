@@ -38,7 +38,7 @@
                                 <i class="fas fa-qrcode fa-3x mb-3" style="color: var(--accent-gold);"></i>
                                 <h5 class="card-title">QR Kodlar</h5>
                                 <p class="card-text">Misafirleriniz için QR kodlar oluşturun</p>
-                                <a href="/dashboard" class="btn btn-success" style="background-color: var(--accent-gold); border-color: var(--accent-gold);">Oluştur</a>
+                                <a href="/dashboard" class="btn btn-primary" style="background-color: var(--accent-gold); border-color: var(--accent-gold);">Oluştur</a>
                             </div>
                         </div>
                     </div>
@@ -48,7 +48,7 @@
                                 <i class="fas fa-images fa-3x mb-3" style="color: var(--accent-gold);"></i>
                                 <h5 class="card-title">Galeri</h5>
                                 <p class="card-text">Paylaşılan fotoğraf ve videoları görüntüleyin</p>
-                                <a href="/dashboard" class="btn btn-info" style="background-color: var(--accent-gold); border-color: var(--accent-gold);">Görüntüle</a>
+                                <a href="/dashboard" class="btn btn-primary" style="background-color: var(--accent-gold); border-color: var(--accent-gold);">Görüntüle</a>
                             </div>
                         </div>
                     </div>

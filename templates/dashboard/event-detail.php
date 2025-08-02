@@ -166,6 +166,8 @@
                                 <i class="fas fa-eye-slash text-secondary"></i> Kapalı - Sadece siz galeriyi görüntüleyebilirsiniz
                             </label>
                         </div>
+                        <!-- Varsayılan değer için gizli input -->
+                        <input type="hidden" name="gallery_public_default" value="0">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -208,7 +210,7 @@ async function handleEditEvent(e) {
                 date: formData.get('date'),
                 description: formData.get('description'),
                 status: formData.get('status'),
-                gallery_public: formData.get('gallery_public') === '1'
+                gallery_public: document.querySelector('input[name="gallery_public"]:checked')?.value === '1'
             })
         });
         

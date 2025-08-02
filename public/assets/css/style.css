@@ -42,19 +42,19 @@ body {
 h1, .h1 {
     font-size: var(--font-size-h1);
     font-weight: var(--font-weight-bold);
-    color: var(--text-primary);
+    color: var(--accent-gold)
 }
 
 h2, .h2 {
     font-size: var(--font-size-h2);
     font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
+    color: var(--accent-gold)
 }
 
 h3, .h3 {
     font-size: var(--font-size-h3);
     font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
+    color: var(--accent-gold)
 }
 
 p, .text-body {

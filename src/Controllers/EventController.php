@@ -215,7 +215,8 @@ class EventController
             $eventData = [
                 'name' => $eventName,
                 'date' => $eventDate,
-                'description' => $description
+                'description' => $description,
+                'gallery_public' => $data['gallery_public'] ?? false
             ];
             
             $this->db->updateEvent($eventId, $eventData);
