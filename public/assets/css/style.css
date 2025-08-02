@@ -292,7 +292,7 @@ a:hover {
 
 /* Feature Cards */
 .feature-icon {
-    color: var(--accent-gold);
+    color: white;
     margin-bottom: 1.5rem;
     font-size: 2rem;
 }
@@ -835,6 +835,7 @@ footer {
         width: 60px;
         height: 60px;
         font-size: 1.5rem;
+        color:white
     }
     
     .navbar-nav {
