@@ -11,6 +11,13 @@ class AuthMiddleware implements MiddlewareInterface
 {
     public function process(Request $request, RequestHandlerInterface $handler): Response
     {
+        // Session ayarlarını yapılandır (daha uzun süre açık kalması için)
+        ini_set('session.gc_maxlifetime', 86400); // 24 saat
+        ini_set('session.cookie_lifetime', 86400); // 24 saat
+        ini_set('session.cookie_secure', 0); // HTTP için
+        ini_set('session.cookie_httponly', 1); // XSS koruması
+        ini_set('session.use_strict_mode', 1); // Güvenlik
+        
         session_start();
         
         $userId = $_SESSION['user_id'] ?? null;

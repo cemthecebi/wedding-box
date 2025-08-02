@@ -6,11 +6,12 @@
         <div class="row justify-content-center">
             <div class="col-lg-8">
                 <h1 class="display-4 fw-bold text-primary mb-4">
-                    <i class="fas fa-heart"></i> Wedding Box
+                    <i class="fas fa-heart"></i> Dijital Anı Kutusu
                 </h1>
                 <p class="lead mb-4">
-                    Düğününüzde çekilen tüm fotoğraf ve videoları tek bir yerde toplayın. 
-                    Misafirleriniz kolayca katkı sağlasın, siz de tüm anıları bir arada görün.
+                    Dijital Anı Kutusu ile Davetinize Ait Hiçbir Anıyı Kaybetmeyin
+                    <br>
+                    Misafirlerinizin çektiği tüm fotoğraf ve videoları tek bir platformda toplayın. En özel gününüzde sevdiklerinizden sesli mesajlar alın.
                 </p>
                 <div class="d-flex justify-content-center gap-3">
                     <a href="/auth/register" class="btn btn-primary btn-lg">

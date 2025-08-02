@@ -33,39 +33,22 @@ function setupEventListeners() {
         createEventForm.addEventListener('submit', handleCreateEvent);
     }
     
-    // Upload form
-    const uploadForm = document.getElementById('uploadForm');
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', handleFileUpload);
-        setupDragAndDrop();
+    // Edit event form
+    const editEventForm = document.getElementById('editEventForm');
+    if (editEventForm) {
+        editEventForm.addEventListener('submit', handleEditEvent);
     }
     
-    // File input change
-    const fileInput = document.getElementById('fileInput');
-    if (fileInput) {
-        fileInput.addEventListener('change', handleFileSelect);
-    }
+
 }
 
 /**
  * Check authentication state
  */
 function checkAuthState() {
-    firebase.auth().onAuthStateChanged(function(user) {
-        if (user) {
-            currentUser = user;
-            console.log('User is signed in:', user.email);
-            
-            // Update UI for authenticated user
-            updateUIForAuthenticatedUser(user);
-        } else {
-            currentUser = null;
-            console.log('User is signed out');
-            
-            // Update UI for unauthenticated user
-            updateUIForUnauthenticatedUser();
-        }
-    });
+    // This function is no longer needed as Firebase Auth is removed.
+    // Authentication state will be managed via server-side sessions.
+    console.log('Authentication state check (client-side) is no longer active.');
 }
 
 /**
@@ -84,18 +67,14 @@ async function handleLogin(e) {
         submitBtn.innerHTML = '<span class="loading"></span> Giriş yapılıyor...';
         submitBtn.disabled = true;
         
-        // Sign in with Firebase
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        const idToken = await userCredential.user.getIdToken();
-        
-        // Send token to backend
+        // Send login data to backend
         const response = await fetch('/auth/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({ idToken })
+            body: JSON.stringify({ email, password })
         });
         
         const result = await response.json();
@@ -168,16 +147,104 @@ async function handleRegister(e) {
 }
 
 /**
+ * Handle edit event form submission
+ */
+async function handleEditEvent(e) {
+    e.preventDefault();
+    
+    const name = document.getElementById('editEventName').value.trim();
+    const date = document.getElementById('editEventDate').value;
+    const description = document.getElementById('editEventDescription').value.trim();
+    const submitBtn = document.querySelector('#editEventForm button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    // Form validation
+    if (!name || name.length < 2) {
+        showAlert('Etkinlik adı en az 2 karakter olmalıdır', 'error');
+        return;
+    }
+    
+    if (!date) {
+        showAlert('Lütfen etkinlik tarihini seçin', 'error');
+        return;
+    }
+    
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+        showAlert('Etkinlik tarihi bugünden önce olamaz', 'error');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        submitBtn.innerHTML = '<span class="loading"></span> Güncelleniyor...';
+        submitBtn.disabled = true;
+        
+        const eventId = window.location.pathname.split('/').pop();
+        const response = await fetch(`/dashboard/events/${eventId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ name, date, description })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(result.message, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            throw new Error(result.error);
+        }
+        
+    } catch (error) {
+        console.error('Edit event error:', error);
+        showAlert(error.message, 'error');
+    } finally {
+        // Reset button state
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+}
+
+/**
  * Handle create event form submission
  */
 async function handleCreateEvent(e) {
     e.preventDefault();
     
-    const name = document.getElementById('eventName').value;
+    const name = document.getElementById('eventName').value.trim();
     const date = document.getElementById('eventDate').value;
-    const description = document.getElementById('eventDescription').value;
+    const description = document.getElementById('eventDescription').value.trim();
     const submitBtn = document.querySelector('#createEventForm button[type="submit"]');
     const originalText = submitBtn.innerHTML;
+    
+    // Form validation
+    if (!name || name.length < 2) {
+        showAlert('Etkinlik adı en az 2 karakter olmalıdır', 'error');
+        return;
+    }
+    
+    if (!date) {
+        showAlert('Lütfen etkinlik tarihini seçin', 'error');
+        return;
+    }
+    
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+        showAlert('Etkinlik tarihi bugünden önce olamaz', 'error');
+        return;
+    }
     
     try {
         // Show loading state
@@ -223,50 +290,15 @@ async function handleFileUpload(e) {
     const fileInput = document.getElementById('fileInput');
     const uploaderName = document.getElementById('uploaderName').value;
     const uploaderEmail = document.getElementById('uploaderEmail').value;
-    const submitBtn = document.querySelector('#uploadForm button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
     
-    if (!fileInput.files[0]) {
-        showAlert('Lütfen bir dosya seçin', 'error');
+    if (!fileInput || !fileInput.files.length) {
+        showAlert('Lütfen en az bir dosya seçin', 'error');
         return;
     }
     
-    try {
-        // Show loading state
-        submitBtn.innerHTML = '<span class="loading"></span> Yükleniyor...';
-        submitBtn.disabled = true;
-        
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        formData.append('uploaderName', uploaderName);
-        formData.append('uploaderEmail', uploaderEmail);
-        
-        const eventId = window.location.pathname.split('/').pop();
-        const response = await fetch(`/upload/${eventId}`, {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showAlert(result.message, 'success');
-            // Reset form
-            fileInput.value = '';
-            document.getElementById('uploaderName').value = '';
-            document.getElementById('uploaderEmail').value = '';
-        } else {
-            throw new Error(result.error);
-        }
-        
-    } catch (error) {
-        console.error('Upload error:', error);
-        showAlert(error.message, 'error');
-    } finally {
-        // Reset button state
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-    }
+    // Form normal şekilde submit olsun
+    // JavaScript ile AJAX yapmıyoruz
+    return true;
 }
 
 /**
@@ -295,31 +327,65 @@ function setupDragAndDrop() {
         
         const files = e.dataTransfer.files;
         if (files.length > 0) {
-            fileInput.files = files;
+            // Mevcut dosyaları koru ve yeni dosyaları ekle
+            const dataTransfer = new DataTransfer();
+            
+            // Mevcut dosyaları ekle
+            for (let i = 0; i < fileInput.files.length; i++) {
+                dataTransfer.items.add(fileInput.files[i]);
+            }
+            
+            // Yeni dosyaları ekle
+            for (let i = 0; i < files.length; i++) {
+                dataTransfer.items.add(files[i]);
+            }
+            
+            fileInput.files = dataTransfer.files;
             handleFileSelect();
         }
     });
 }
 
 /**
+ * HTML entity'leri decode et
+ */
+function decodeHTMLEntities(text) {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    return textarea.value;
+}
+
+
+
+/**
  * Handle file selection
  */
 function handleFileSelect() {
+    console.log('handleFileSelect called');
     const fileInput = document.getElementById('fileInput');
-    const fileInfo = document.getElementById('fileInfo');
+    const fileList = document.getElementById('fileList');
     
-    if (fileInput.files[0]) {
-        const file = fileInput.files[0];
-        const fileSize = (file.size / (1024 * 1024)).toFixed(2);
+    console.log('File input:', fileInput);
+    console.log('File list:', fileList);
+    console.log('Files count:', fileInput ? fileInput.files.length : 'no fileInput');
+    
+    if (fileInput && fileInput.files.length > 0) {
+        console.log('Files selected, showing list');
+        let html = '<div class="alert alert-success">';
+        html += '<h6>Seçilen Dosyalar:</h6><ul>';
         
-        fileInfo.innerHTML = `
-            <div class="alert alert-info">
-                <i class="fas fa-file"></i> 
-                <strong>${file.name}</strong> (${fileSize} MB)
-            </div>
-        `;
+        for (let i = 0; i < fileInput.files.length; i++) {
+            const file = fileInput.files[i];
+            const size = (file.size / 1024 / 1024).toFixed(2);
+            html += `<li><strong>${file.name}</strong> (${size} MB)</li>`;
+        }
+        
+        html += '</ul></div>';
+        fileList.innerHTML = html;
+        console.log('File list updated');
     } else {
-        fileInfo.innerHTML = '';
+        console.log('No files selected');
+        fileList.innerHTML = '';
     }
 }
 
@@ -388,100 +454,7 @@ function downloadQRCode() {
     }
 }
 
-/**
- * Load gallery files
- */
-async function loadGalleryFiles(eventId) {
-    try {
-        const response = await fetch(`/api/events/${eventId}/files`, {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            displayGalleryFiles(result.files);
-        } else {
-            throw new Error(result.error);
-        }
-        
-    } catch (error) {
-        console.error('Load gallery error:', error);
-        showAlert('Galeri yüklenirken hata oluştu', 'error');
-    }
-}
 
-/**
- * Display gallery files
- */
-function displayGalleryFiles(files) {
-    const galleryContainer = document.getElementById('galleryContainer');
-    if (!galleryContainer) return;
-    
-    if (files.length === 0) {
-        galleryContainer.innerHTML = '<p class="text-muted text-center">Henüz dosya yüklenmemiş.</p>';
-        return;
-    }
-    
-    const galleryHTML = files.map(file => `
-        <div class="gallery-item">
-            ${file.mimeType.startsWith('image/') ? 
-                `<img src="${file.url}" alt="${file.originalName}" onclick="openImageModal('${file.url}', '${file.originalName}')">` :
-                `<div class="video-placeholder">
-                    <i class="fas fa-video fa-3x"></i>
-                    <p>${file.originalName}</p>
-                </div>`
-            }
-            <div class="overlay">
-                <div class="btn-group">
-                    <a href="${file.url}" class="btn btn-light btn-sm" download>
-                        <i class="fas fa-download"></i>
-                    </a>
-                    <button class="btn btn-danger btn-sm" onclick="deleteFile('${file.id}')">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    `).join('');
-    
-    galleryContainer.innerHTML = galleryHTML;
-}
-
-/**
- * Delete file
- */
-async function deleteFile(fileId) {
-    if (!confirm('Bu dosyayı silmek istediğinizden emin misiniz?')) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/files/${fileId}`, {
-            method: 'DELETE',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showAlert(result.message, 'success');
-            // Reload gallery
-            const eventId = window.location.pathname.split('/')[3];
-            loadGalleryFiles(eventId);
-        } else {
-            throw new Error(result.error);
-        }
-        
-    } catch (error) {
-        console.error('Delete file error:', error);
-        showAlert(error.message, 'error');
-    }
-}
 
 /**
  * Open image modal
@@ -516,4 +489,10 @@ function openImageModal(imageUrl, imageName) {
     modal.addEventListener('hidden.bs.modal', () => {
         document.body.removeChild(modal);
     });
-} 
+}
+
+// Initialize event listeners when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('App.js loaded, setting up event listeners');
+    setupEventListeners();
+}); 

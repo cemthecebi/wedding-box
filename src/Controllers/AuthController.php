@@ -20,6 +20,11 @@ class AuthController
      */
     public function showLogin(Request $request, Response $response): Response
     {
+        // Eğer kullanıcı zaten giriş yapmışsa dashboard'a yönlendir
+        if (isset($_SESSION['user_id'])) {
+            return $response->withHeader('Location', '/dashboard')->withStatus(302);
+        }
+        
         return $this->render($response, 'auth/login.php', [
             'title' => 'Giriş Yap'
         ]);
@@ -30,6 +35,11 @@ class AuthController
      */
     public function showRegister(Request $request, Response $response): Response
     {
+        // Eğer kullanıcı zaten giriş yapmışsa dashboard'a yönlendir
+        if (isset($_SESSION['user_id'])) {
+            return $response->withHeader('Location', '/dashboard')->withStatus(302);
+        }
+        
         return $this->render($response, 'auth/register.php', [
             'title' => 'Kayıt Ol'
         ]);
@@ -40,7 +50,13 @@ class AuthController
      */
     public function login(Request $request, Response $response): Response
     {
-        $data = $request->getParsedBody();
+        $contentType = $request->getHeaderLine('Content-Type');
+        
+        if (strpos($contentType, 'application/json') !== false) {
+            $data = json_decode($request->getBody()->getContents(), true);
+        } else {
+            $data = $request->getParsedBody();
+        }
         
         try {
             $email = $data['email'] ?? '';
@@ -63,22 +79,32 @@ class AuthController
                 throw new \Exception('E-posta veya şifre hatalı');
             }
             
+            // Session ayarlarını yapılandır (daha uzun süre açık kalması için)
+            ini_set('session.gc_maxlifetime', 86400); // 24 saat
+            ini_set('session.cookie_lifetime', 86400); // 24 saat
+            ini_set('session.cookie_secure', 0); // HTTP için
+            ini_set('session.cookie_httponly', 1); // XSS koruması
+            ini_set('session.use_strict_mode', 1); // Güvenlik
+            
             // Session'a kullanıcı bilgilerini kaydet
             session_start();
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['email'] = $user['email'];
             $_SESSION['display_name'] = $user['display_name'];
+            $_SESSION['login_time'] = time(); // Giriş zamanını kaydet
             
-            return $response->withJson([
+            $response->getBody()->write(json_encode([
                 'success' => true,
                 'redirect' => '/dashboard'
-            ]);
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
             
         } catch (\Exception $e) {
-            return $response->withJson([
+            $response->getBody()->write(json_encode([
                 'success' => false,
                 'error' => $e->getMessage()
-            ], 400);
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
         }
     }
     
@@ -87,7 +113,13 @@ class AuthController
      */
     public function register(Request $request, Response $response): Response
     {
-        $data = $request->getParsedBody();
+        $contentType = $request->getHeaderLine('Content-Type');
+        
+        if (strpos($contentType, 'application/json') !== false) {
+            $data = json_decode($request->getBody()->getContents(), true);
+        } else {
+            $data = $request->getParsedBody();
+        }
         
         try {
             $email = $data['email'] ?? '';
@@ -113,17 +145,19 @@ class AuthController
             // Veritabanında kullanıcı oluştur
             $userId = $this->db->createUser($email, $passwordHash, $displayName);
             
-            return $response->withJson([
+            $response->getBody()->write(json_encode([
                 'success' => true,
                 'message' => 'Kayıt başarılı! Giriş yapabilirsiniz.',
                 'redirect' => '/auth/login'
-            ]);
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
             
         } catch (\Exception $e) {
-            return $response->withJson([
+            $response->getBody()->write(json_encode([
                 'success' => false,
                 'error' => $e->getMessage()
-            ], 400);
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
         }
     }
     
@@ -133,6 +167,19 @@ class AuthController
     public function logout(Request $request, Response $response): Response
     {
         session_start();
+        
+        // Session'ı tamamen temizle
+        $_SESSION = array();
+        
+        // Session cookie'sini sil
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+            );
+        }
+        
         session_destroy();
         
         return $response->withHeader('Location', '/')->withStatus(302);

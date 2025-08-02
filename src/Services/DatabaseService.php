@@ -155,6 +155,69 @@ class DatabaseService
         }
     }
     
+        /**
+     * Etkinlik güncelle
+     */
+    public function updateEvent(string $eventId, array $eventData): bool
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                UPDATE events
+                SET name = ?, date = ?, description = ?, gallery_public = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+
+            return $stmt->execute([
+                $eventData['name'],
+                $eventData['date'],
+                $eventData['description'],
+                $eventData['gallery_public'] ?? false,
+                $eventId
+            ]);
+
+        } catch (PDOException $e) {
+            throw new \Exception('Etkinlik güncellenemedi: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Etkinlik galeri ayarını güncelle
+     */
+    public function updateEventGalleryPublic(string $eventId, bool $galleryPublic): bool
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                UPDATE events
+                SET gallery_public = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+
+            return $stmt->execute([$galleryPublic, $eventId]);
+
+        } catch (PDOException $e) {
+            throw new \Exception('Galeri ayarı güncellenemedi: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Etkinlik durumunu güncelle
+     */
+    public function updateEventStatus(string $eventId, string $status): bool
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                UPDATE events
+                SET status = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+
+            return $stmt->execute([$status, $eventId]);
+
+        } catch (PDOException $e) {
+            throw new \Exception('Etkinlik durumu güncellenemedi: ' . $e->getMessage());
+        }
+    }
+    
     /**
      * Etkinlik detayını getir
      */
@@ -226,6 +289,29 @@ class DatabaseService
             
         } catch (PDOException $e) {
             throw new \Exception('Dosyalar getirilemedi: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Etkinlikteki yükleyen kullanıcıları getir
+     */
+    public function getEventUploaders(string $eventId): array
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT DISTINCT 
+                    CASE 
+                        WHEN uploader_name = '' OR uploader_name IS NULL THEN 'Anonim Kullanıcı'
+                        ELSE uploader_name 
+                    END as display_name
+                FROM files 
+                WHERE event_id = ? 
+                ORDER BY display_name ASC
+            ");
+            $stmt->execute([$eventId]);
+            return $stmt->fetchAll(PDO::FETCH_COLUMN);
+        } catch (PDOException $e) {
+            throw new \Exception('Yükleyen kullanıcılar getirilemedi: ' . $e->getMessage());
         }
     }
     

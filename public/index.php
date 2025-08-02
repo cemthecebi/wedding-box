@@ -5,6 +5,17 @@
  * Bu dosya tüm istekleri karşılar ve Slim Framework'e yönlendirir
  */
 
+// Session ayarlarını yapılandır (daha uzun süre açık kalması için)
+ini_set('session.gc_maxlifetime', 86400); // 24 saat
+ini_set('session.cookie_lifetime', 86400); // 24 saat
+ini_set('session.cookie_secure', 0); // HTTP için
+ini_set('session.cookie_httponly', 1); // XSS koruması
+ini_set('session.use_strict_mode', 1); // Güvenlik
+
+// Error reporting ayarları
+error_reporting(E_ALL & ~E_DEPRECATED);
+ini_set('display_errors', 1);
+
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Slim\Factory\AppFactory;
@@ -36,13 +47,27 @@ $container->set('renderer', function () {
 });
 
 // Database service
+$container->set(DatabaseService::class, function () {
+    return DatabaseService::getInstance();
+});
+
 $container->set('db', function () {
     return DatabaseService::getInstance();
 });
 
 // Routes tanımla
 $app->get('/', function ($request, $response) {
-    return $this->get('renderer')->render($response, 'landing.php');
+    // Session'ı başlat (navbar'da kullanıcı durumunu kontrol etmek için)
+    session_start();
+    
+    ob_start();
+    include __DIR__ . '/../templates/home.php';
+    $homeContent = ob_get_clean();
+
+    return $this->get('renderer')->render($response, 'layout.php', [
+        'title' => 'Dijital Anı Kutusu',
+        'content' => $homeContent
+    ]);
 });
 
 // Auth routes
@@ -60,6 +85,9 @@ $app->group('/dashboard', function ($group) {
     $group->get('/events', [EventController::class, 'listEvents']);
     $group->post('/events', [EventController::class, 'createEvent']);
     $group->get('/events/{id}', [EventController::class, 'showEvent']);
+                $group->put('/events/{id}', [EventController::class, 'updateEvent']);
+            $group->patch('/events/{id}/status', [EventController::class, 'updateEventStatus']);
+    $group->patch('/events/{id}/gallery-public', [EventController::class, 'updateEventGalleryPublic']);
     $group->get('/events/{id}/qr', [EventController::class, 'showQR']);
     $group->get('/events/{id}/gallery', [GalleryController::class, 'showGallery']);
 })->add(new AuthMiddleware());
@@ -68,11 +96,13 @@ $app->group('/dashboard', function ($group) {
 $app->group('/upload', function ($group) {
     $group->get('/{eventId}', [UploadController::class, 'showUploadForm']);
     $group->post('/{eventId}', [UploadController::class, 'uploadFile']);
+    $group->get('/{eventId}/gallery', [UploadController::class, 'showPublicGallery']);
 });
 
 // API routes
 $app->group('/api', function ($group) {
     $group->get('/events/{id}/files', [GalleryController::class, 'getFiles']);
+    $group->delete('/files/bulk', [GalleryController::class, 'deleteMultipleFiles']);
     $group->delete('/files/{fileId}', [GalleryController::class, 'deleteFile']);
 })->add(new AuthMiddleware());
 

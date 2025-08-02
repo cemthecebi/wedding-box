@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# CSS, JS, resim dosyalarına doğrudan erişime izin ver
+RewriteCond %{REQUEST_URI} !\.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$
+
 # Tüm istekleri index.php'ye yönlendir
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

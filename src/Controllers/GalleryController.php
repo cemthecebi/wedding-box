@@ -20,7 +20,6 @@ class GalleryController
      */
     public function showGallery(Request $request, Response $response, array $args): Response
     {
-        session_start();
         $userId = $_SESSION['user_id'] ?? null;
         
         if (!$userId) {
@@ -38,11 +37,13 @@ class GalleryController
             }
             
             $files = $this->db->getEventFiles($eventId);
+            $uploaders = $this->db->getEventUploaders($eventId);
             
             return $this->render($response, 'dashboard/gallery.php', [
                 'title' => 'Galeri - ' . $event['name'],
                 'event' => $event,
-                'files' => $files
+                'files' => $files,
+                'uploaders' => $uploaders
             ]);
             
         } catch (\Exception $e) {
@@ -58,7 +59,6 @@ class GalleryController
      */
     public function getFiles(Request $request, Response $response, array $args): Response
     {
-        session_start();
         $userId = $_SESSION['user_id'] ?? null;
         
         if (!$userId) {
@@ -83,16 +83,18 @@ class GalleryController
                 $file['thumbnailUrl'] = $this->isImage($file['mimeType']) ? $file['url'] : null;
             }
             
-            return $response->withJson([
+            $response->getBody()->write(json_encode([
                 'success' => true,
                 'files' => $files
-            ]);
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
             
         } catch (\Exception $e) {
-            return $response->withJson([
+            $response->getBody()->write(json_encode([
                 'success' => false,
                 'error' => $e->getMessage()
-            ], 500);
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
         }
     }
     
@@ -101,7 +103,6 @@ class GalleryController
      */
     public function deleteFile(Request $request, Response $response, array $args): Response
     {
-        session_start();
         $userId = $_SESSION['user_id'] ?? null;
         
         if (!$userId) {
@@ -110,12 +111,17 @@ class GalleryController
         
         $fileId = $args['fileId'] ?? null;
         
+        if (!$fileId) {
+            return $response->withJson(['error' => 'File ID is required'], 400);
+        }
+        
         try {
             // Dosya bilgilerini al
             $file = $this->db->getFile($fileId);
             
             if (!$file) {
-                return $response->withJson(['error' => 'File not found'], 404);
+                $response->getBody()->write(json_encode(['error' => 'File not found']));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
             }
             
             // Etkinlik bilgilerini al
@@ -135,10 +141,99 @@ class GalleryController
             // Veritabanından kaydı sil
             $this->db->deleteFile($fileId);
             
-            return $response->withJson([
+            $response->getBody()->write(json_encode([
                 'success' => true,
                 'message' => 'Dosya başarıyla silindi'
-            ]);
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
+            
+        } catch (\Exception $e) {
+            return $response->withJson([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * API: Toplu dosya sil
+     */
+    public function deleteMultipleFiles(Request $request, Response $response, array $args): Response
+    {
+        $userId = $_SESSION['user_id'] ?? null;
+        
+        if (!$userId) {
+            return $response->withJson(['error' => 'Unauthorized'], 401);
+        }
+        
+        $contentType = $request->getHeaderLine('Content-Type');
+        
+        if (strpos($contentType, 'application/json') !== false) {
+            $data = json_decode($request->getBody()->getContents(), true);
+        } else {
+            $data = $request->getParsedBody();
+        }
+        
+        $fileIds = $data['fileIds'] ?? [];
+        
+        if (empty($fileIds)) {
+            return $response->withJson(['error' => 'File IDs are required'], 400);
+        }
+        
+        try {
+            $deletedCount = 0;
+            $failedCount = 0;
+            $errors = [];
+            
+            foreach ($fileIds as $fileId) {
+                try {
+                    // Dosya bilgilerini al
+                    $file = $this->db->getFile($fileId);
+                    
+                    if (!$file) {
+                        $failedCount++;
+                        $errors[] = "File ID {$fileId}: File not found";
+                        continue;
+                    }
+                    
+                    // Etkinlik bilgilerini al
+                    $event = $this->db->getEvent($file['event_id']);
+                    
+                    // Kullanıcının kendi etkinliği mi kontrol et
+                    if ($event['user_id'] !== $userId) {
+                        $failedCount++;
+                        $errors[] = "File ID {$fileId}: Access denied";
+                        continue;
+                    }
+                    
+                    // Fiziksel dosyayı sil
+                    $filePath = __DIR__ . '/../../uploads/' . $file['event_id'] . '/' . $file['file_name'];
+                    if (file_exists($filePath)) {
+                        unlink($filePath);
+                    }
+                    
+                    // Veritabanından kaydı sil
+                    if ($this->db->deleteFile($fileId)) {
+                        $deletedCount++;
+                    } else {
+                        $failedCount++;
+                        $errors[] = "File ID {$fileId}: Database deletion failed";
+                    }
+                    
+                } catch (\Exception $e) {
+                    $failedCount++;
+                    $errors[] = "File ID {$fileId}: " . $e->getMessage();
+                }
+            }
+            
+            $response->getBody()->write(json_encode([
+                'success' => $deletedCount > 0,
+                'deletedCount' => $deletedCount,
+                'failedCount' => $failedCount,
+                'message' => "{$deletedCount} dosya başarıyla silindi" . ($failedCount > 0 ? ", {$failedCount} dosya silinemedi" : ""),
+                'errors' => $errors
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
             
         } catch (\Exception $e) {
             return $response->withJson([

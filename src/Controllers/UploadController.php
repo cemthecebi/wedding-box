@@ -29,9 +29,13 @@ class UploadController
         try {
             $event = $this->db->getEvent($eventId);
             
+            // Etkinlik pasif mi kontrol et
+            $isInactive = ($event['status'] ?? 'active') === 'inactive';
+            
             return $this->render($response, 'upload/form.php', [
                 'title' => 'Fotoğraf/Video Yükle - ' . $event['name'],
-                'event' => $event
+                'event' => $event,
+                'isInactive' => $isInactive
             ]);
             
         } catch (\Exception $e) {
@@ -50,28 +54,29 @@ class UploadController
         $eventId = $args['eventId'] ?? null;
         
         if (!$eventId) {
-            return $response->withJson(['error' => 'Event ID gerekli'], 400);
+            $response->getBody()->write(json_encode(['error' => 'Event ID gerekli']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
         }
         
         try {
             // Etkinliği kontrol et
             $event = $this->db->getEvent($eventId);
             
-            // Upload edilen dosyayı al
-            $uploadedFiles = $request->getUploadedFiles();
-            $file = $uploadedFiles['file'] ?? null;
+            // Etkinlik pasif mi kontrol et
+            if (($event['status'] ?? 'active') === 'inactive') {
+                throw new \Exception('Bu etkinlik pasif durumda. Yükleme yapamazsınız.');
+            }
             
-            if (!$file) {
+            // Upload edilen dosyaları al
+            $uploadedFiles = $request->getUploadedFiles();
+            $files = $uploadedFiles['files'] ?? [];
+            
+            if (empty($files)) {
                 throw new \Exception('Dosya seçilmedi');
             }
             
-            // Dosya validasyonu
-            $this->validateFile($file);
-            
-            // Dosya adını oluştur
-            $originalName = $file->getClientFilename();
-            $extension = pathinfo($originalName, PATHINFO_EXTENSION);
-            $fileName = uniqid() . '_' . time() . '.' . $extension;
+            $uploadedCount = 0;
+            $errors = [];
             
             // Upload klasörünü kontrol et/oluştur
             $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
@@ -79,39 +84,120 @@ class UploadController
                 mkdir($uploadDir, 0755, true);
             }
             
-            // Dosyayı kaydet
-            $filePath = $uploadDir . '/' . $fileName;
-            $file->moveTo($filePath);
+            foreach ($files as $file) {
+                try {
+                    // Dosya validasyonu
+                    $this->validateFile($file);
+                    
+                    // Dosya adını oluştur
+                    $originalName = $file->getClientFilename();
+                    $extension = pathinfo($originalName, PATHINFO_EXTENSION);
+                    $fileName = uniqid() . '_' . time() . '.' . $extension;
+                    
+                    // Dosyayı kaydet
+                    $filePath = $uploadDir . '/' . $fileName;
+                    $file->moveTo($filePath);
+                    
+                    // Dosya bilgilerini al
+                    $fileSize = filesize($filePath);
+                    $mimeType = mime_content_type($filePath);
+                    
+                    // Veritabanına kayıt oluştur
+                    // Uploader name kontrolü
+                    $uploaderName = trim($_POST['uploaderName'] ?? '');
+                    if (empty($uploaderName)) {
+                        $uploaderName = 'Anonim Kullanıcı';
+                    }
+                    
+                    $fileData = [
+                        'originalName' => $originalName,
+                        'fileName' => $fileName,
+                        'fileSize' => $fileSize,
+                        'mimeType' => $mimeType,
+                        'uploaderName' => $uploaderName,
+                        'uploaderEmail' => $_POST['uploaderEmail'] ?? '',
+                        'uploadIp' => $_SERVER['REMOTE_ADDR'] ?? '',
+                        'userAgent' => $_SERVER['HTTP_USER_AGENT'] ?? ''
+                    ];
+                    
+                    $this->db->createFileRecord($eventId, $fileData);
+                    $uploadedCount++;
+                    
+                } catch (\Exception $e) {
+                    $errors[] = $originalName . ': ' . $e->getMessage();
+                }
+            }
             
-            // Dosya bilgilerini al
-            $fileSize = filesize($filePath);
-            $mimeType = mime_content_type($filePath);
+            $message = $uploadedCount . ' dosya başarıyla yüklendi!';
+            if (!empty($errors)) {
+                $message .= ' Hatalar: ' . implode(', ', $errors);
+            }
             
-            // Firebase'e kayıt oluştur
-            $fileData = [
-                'originalName' => $originalName,
-                'fileName' => $fileName,
-                'fileSize' => $fileSize,
-                'mimeType' => $mimeType,
-                'uploaderName' => $_POST['uploaderName'] ?? 'Anonim',
-                'uploaderEmail' => $_POST['uploaderEmail'] ?? '',
-                'uploadIp' => $_SERVER['REMOTE_ADDR'] ?? '',
-                'userAgent' => $_SERVER['HTTP_USER_AGENT'] ?? ''
-            ];
-            
-            $fileId = $this->db->createFileRecord($eventId, $fileData);
-            
-            return $response->withJson([
+            $response->getBody()->write(json_encode([
                 'success' => true,
-                'message' => 'Dosya başarıyla yüklendi!',
-                'fileId' => $fileId
+                'message' => $message,
+                'uploadedCount' => $uploadedCount,
+                'errors' => $errors
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
+            
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+    }
+    
+    /**
+     * Misafir kullanıcılar için galeri sayfasını göster
+     */
+    public function showPublicGallery(Request $request, Response $response, array $args): Response
+    {
+        $eventId = $args['eventId'] ?? null;
+        
+        if (!$eventId) {
+            return $response->withStatus(404);
+        }
+        
+        try {
+            $event = $this->db->getEvent($eventId);
+            
+            // Galeri görüntüleme açık mı kontrol et
+            if (!($event['gallery_public'] ?? false)) {
+                return $this->render($response, 'upload/gallery.php', [
+                    'title' => 'Galeri Erişimi Yok',
+                    'error' => 'Bu etkinliğin galerisi misafir kullanıcılar için kapalı.'
+                ]);
+            }
+            
+            // Etkinlik pasif mi kontrol et
+            if (($event['status'] ?? 'active') === 'inactive') {
+                return $this->render($response, 'upload/gallery.php', [
+                    'title' => 'Etkinlik Pasif',
+                    'error' => 'Bu etkinlik pasif durumda.'
+                ]);
+            }
+            
+            // Dosyaları getir
+            $files = $this->db->getEventFiles($eventId);
+            
+            // Yükleyen kullanıcıları getir
+            $uploaders = $this->db->getEventUploaders($eventId);
+            
+            return $this->render($response, 'upload/gallery.php', [
+                'title' => 'Galeri - ' . $event['name'],
+                'event' => $event,
+                'files' => $files,
+                'uploaders' => $uploaders
             ]);
             
         } catch (\Exception $e) {
-            return $response->withJson([
-                'success' => false,
-                'error' => $e->getMessage()
-            ], 400);
+            return $this->render($response, 'upload/gallery.php', [
+                'title' => 'Etkinlik Bulunamadı',
+                'error' => 'Bu etkinlik bulunamadı veya artık mevcut değil.'
+            ]);
         }
     }
     
@@ -121,27 +207,43 @@ class UploadController
     private function validateFile($file): void
     {
         $allowedTypes = [
+            // Fotoğraf formatları
             'image/jpeg',
             'image/jpg',
             'image/png',
             'image/gif',
+            'image/bmp',
+            'image/tiff',
+            'image/tif',
+            'image/webp',
+            'image/svg+xml',
+            'image/heic',
+            'image/heif',
+            'image/avif',
+            // Video formatları
             'video/mp4',
             'video/mov',
             'video/avi',
-            'video/webm'
+            'video/webm',
+            'video/mkv',
+            'video/wmv',
+            'video/flv',
+            'video/3gp',
+            'video/ogv',
+            'video/m4v'
         ];
         
-        $maxSize = 25 * 1024 * 1024; // 25MB
+        $maxSize = 50 * 1024 * 1024; // 50MB
         
         // Dosya boyutu kontrolü
         if ($file->getSize() > $maxSize) {
-            throw new \Exception('Dosya boyutu 25MB\'dan büyük olamaz');
+            throw new \Exception('Dosya boyutu 50MB\'dan büyük olamaz');
         }
         
         // Dosya tipi kontrolü
         $mimeType = $file->getClientMediaType();
         if (!in_array($mimeType, $allowedTypes)) {
-            throw new \Exception('Sadece fotoğraf ve video dosyaları yüklenebilir');
+            throw new \Exception('Desteklenen formatlar: JPEG, PNG, GIF, BMP, TIFF, WebP, SVG, HEIC, HEIF, AVIF, MP4, MOV, AVI, WebM, MKV, WMV, FLV, 3GP, OGV, M4V');
         }
         
         // Dosya adı kontrolü

@@ -22,7 +22,6 @@ class EventController
      */
     public function dashboard(Request $request, Response $response): Response
     {
-        session_start();
         $userId = $_SESSION['user_id'] ?? null;
         
         if (!$userId) {
@@ -59,7 +58,6 @@ class EventController
      */
     public function listEvents(Request $request, Response $response): Response
     {
-        session_start();
         $userId = $_SESSION['user_id'] ?? null;
         
         if (!$userId) {
@@ -68,10 +66,12 @@ class EventController
         
         try {
             $events = $this->db->getUserEvents($userId);
-            return $response->withJson(['events' => $events]);
+            $response->getBody()->write(json_encode(['events' => $events]));
+            return $response->withHeader('Content-Type', 'application/json');
             
         } catch (\Exception $e) {
-            return $response->withJson(['error' => $e->getMessage()], 500);
+            $response->getBody()->write(json_encode(['error' => $e->getMessage()]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
         }
     }
     
@@ -80,14 +80,20 @@ class EventController
      */
     public function createEvent(Request $request, Response $response): Response
     {
-        session_start();
         $userId = $_SESSION['user_id'] ?? null;
         
         if (!$userId) {
-            return $response->withJson(['error' => 'Unauthorized'], 401);
+            $response->getBody()->write(json_encode(['error' => 'Unauthorized']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
         }
         
-        $data = $request->getParsedBody();
+        $contentType = $request->getHeaderLine('Content-Type');
+        
+        if (strpos($contentType, 'application/json') !== false) {
+            $data = json_decode($request->getBody()->getContents(), true);
+        } else {
+            $data = $request->getParsedBody();
+        }
         
         try {
             $eventName = $data['name'] ?? '';
@@ -113,17 +119,19 @@ class EventController
                 mkdir($uploadDir, 0755, true);
             }
             
-            return $response->withJson([
+            $response->getBody()->write(json_encode([
                 'success' => true,
                 'eventId' => $eventId,
                 'message' => 'Etkinlik başarıyla oluşturuldu'
-            ]);
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
             
         } catch (\Exception $e) {
-            return $response->withJson([
+            $response->getBody()->write(json_encode([
                 'success' => false,
                 'error' => $e->getMessage()
-            ], 400);
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
         }
     }
     
@@ -132,7 +140,6 @@ class EventController
      */
     public function showEvent(Request $request, Response $response, array $args): Response
     {
-        session_start();
         $userId = $_SESSION['user_id'] ?? null;
         
         if (!$userId) {
@@ -149,6 +156,10 @@ class EventController
                 throw new \Exception('Bu etkinliğe erişim izniniz yok');
             }
             
+            // Dosya sayısını al
+            $files = $this->db->getEventFiles($eventId);
+            $event['file_count'] = count($files);
+            
             return $this->render($response, 'dashboard/event-detail.php', [
                 'title' => $event['name'],
                 'event' => $event
@@ -163,11 +174,184 @@ class EventController
     }
     
     /**
+     * Etkinlik güncelle
+     */
+    public function updateEvent(Request $request, Response $response, array $args): Response
+    {
+        $userId = $_SESSION['user_id'] ?? null;
+        
+        if (!$userId) {
+            $response->getBody()->write(json_encode(['error' => 'Unauthorized']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
+        }
+        
+        $eventId = $args['id'] ?? null;
+        
+        $contentType = $request->getHeaderLine('Content-Type');
+        
+        if (strpos($contentType, 'application/json') !== false) {
+            $data = json_decode($request->getBody()->getContents(), true);
+        } else {
+            $data = $request->getParsedBody();
+        }
+        
+        try {
+            $event = $this->db->getEvent($eventId);
+            
+            // Kullanıcının kendi etkinliği mi kontrol et
+            if ($event['user_id'] !== $userId) {
+                throw new \Exception('Bu etkinliğe erişim izniniz yok');
+            }
+            
+            $eventName = $data['name'] ?? '';
+            $eventDate = $data['date'] ?? '';
+            $description = $data['description'] ?? '';
+            
+            // Validasyon
+            if (empty($eventName) || empty($eventDate)) {
+                throw new \Exception('Etkinlik adı ve tarihi gerekli');
+            }
+            
+            $eventData = [
+                'name' => $eventName,
+                'date' => $eventDate,
+                'description' => $description
+            ];
+            
+            $this->db->updateEvent($eventId, $eventData);
+            
+            // Durum güncellemesi
+            $status = $data['status'] ?? 'active';
+            if (in_array($status, ['active', 'inactive'])) {
+                $this->db->updateEventStatus($eventId, $status);
+            }
+            
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => 'Etkinlik başarıyla güncellendi'
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
+            
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+    }
+    
+    /**
+     * Etkinlik durumunu güncelle
+     */
+    public function updateEventStatus(Request $request, Response $response, array $args): Response
+    {
+        $userId = $_SESSION['user_id'] ?? null;
+        
+        if (!$userId) {
+            $response->getBody()->write(json_encode(['error' => 'Unauthorized']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
+        }
+        
+        $eventId = $args['id'] ?? null;
+        
+        try {
+            // Etkinliği kontrol et
+            $event = $this->db->getEvent($eventId);
+            if ($event['user_id'] !== $userId) {
+                throw new \Exception('Bu etkinliğe erişim izniniz yok');
+            }
+            
+            // Request body'yi parse et
+            $contentType = $request->getHeaderLine('Content-Type');
+            if (strpos($contentType, 'application/json') !== false) {
+                $data = json_decode($request->getBody()->getContents(), true);
+            } else {
+                $data = $request->getParsedBody();
+            }
+            
+            $status = $data['status'] ?? '';
+            
+            if (!in_array($status, ['active', 'inactive'])) {
+                throw new \Exception('Geçersiz durum değeri');
+            }
+            
+            $this->db->updateEventStatus($eventId, $status);
+            
+            $statusText = $status === 'active' ? 'aktif' : 'pasif';
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => "Etkinlik durumu {$statusText} olarak güncellendi"
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
+            
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+    }
+    
+    /**
+     * Etkinlik galeri ayarını güncelle
+     */
+    public function updateEventGalleryPublic(Request $request, Response $response, array $args): Response
+    {
+        $userId = $_SESSION['user_id'] ?? null;
+        
+        if (!$userId) {
+            $response->getBody()->write(json_encode(['error' => 'Unauthorized']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
+        }
+        
+        $eventId = $args['id'] ?? null;
+        
+        try {
+            // Etkinliği kontrol et
+            $event = $this->db->getEvent($eventId);
+            if ($event['user_id'] !== $userId) {
+                throw new \Exception('Bu etkinliğe erişim izniniz yok');
+            }
+            
+            // Request body'yi parse et
+            $contentType = $request->getHeaderLine('Content-Type');
+            if (strpos($contentType, 'application/json') !== false) {
+                $data = json_decode($request->getBody()->getContents(), true);
+            } else {
+                $data = $request->getParsedBody();
+            }
+            
+            $galleryPublic = $data['gallery_public'] ?? false;
+            
+            if (!is_bool($galleryPublic)) {
+                throw new \Exception('Geçersiz galeri ayarı');
+            }
+            
+            $this->db->updateEventGalleryPublic($eventId, $galleryPublic);
+            
+            $statusText = $galleryPublic ? 'açık' : 'kapalı';
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'message' => "Galeri görüntüleme {$statusText} olarak güncellendi"
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
+            
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+    }
+    
+    /**
      * QR kod sayfasını göster
      */
     public function showQR(Request $request, Response $response, array $args): Response
     {
-        session_start();
         $userId = $_SESSION['user_id'] ?? null;
         
         if (!$userId) {
