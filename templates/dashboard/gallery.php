@@ -7,9 +7,16 @@
                 <h1 class="h3 mb-0">
                     <i class="fas fa-images"></i> Galeri - <?= htmlspecialchars($event['name']) ?>
                 </h1>
-                <a href="/dashboard/events/<?= $event['id'] ?>" class="btn btn-outline-brown">
-                    <i class="fas fa-arrow-left"></i> Etkinliğe Dön
-                </a>
+                <div class="d-flex gap-2">
+                    <?php if (!empty($googleDriveLink)): ?>
+                        <a href="<?= htmlspecialchars($googleDriveLink) ?>" target="_blank" class="btn btn-success">
+                            <i class="fab fa-google-drive"></i> Google Drive'da Aç
+                        </a>
+                    <?php endif; ?>
+                    <a href="/dashboard/events/<?= $event['id'] ?>" class="btn btn-outline-brown">
+                        <i class="fas fa-arrow-left"></i> Etkinliğe Dön
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -81,7 +88,14 @@
                         <div class="selection-overlay">
                             <input type="checkbox" class="file-checkbox" data-file-id="<?= $file['id'] ?>" data-file-name="<?= htmlspecialchars($file['original_name']) ?>" data-file-url="/uploads/<?= $file['event_id'] ?>/<?= $file['file_name'] ?>">
                         </div>
-                        <?php if (strpos($file['mime_type'], 'image/') === 0): ?>
+                        <?php if (!empty($file['google_drive_web_link'])): ?>
+                            <!-- Google Drive dosyası -->
+                            <div class="google-drive-file">
+                                <i class="fab fa-google-drive fa-3x text-success"></i>
+                                <p><?= htmlspecialchars($file['original_name']) ?></p>
+                                <small class="text-muted">Google Drive'da</small>
+                            </div>
+                        <?php elseif (strpos($file['mime_type'], 'image/') === 0): ?>
                             <img src="/uploads/<?= $file['event_id'] ?>/<?= $file['file_name'] ?>" 
                                  alt="<?= htmlspecialchars($file['original_name']) ?>"
                                  onclick="openImageModal('/uploads/<?= $file['event_id'] ?>/<?= $file['file_name'] ?>', '<?= htmlspecialchars($file['original_name']) ?>')"
@@ -94,15 +108,24 @@
                         <?php endif; ?>
                         <div class="overlay">
                             <div class="btn-group">
-                                <?php if (strpos($file['mime_type'], 'image/') === 0): ?>
-                                    <button class="btn btn-brown btn-sm" onclick="openImageModal('/uploads/<?= $file['event_id'] ?>/<?= $file['file_name'] ?>', '<?= htmlspecialchars($file['original_name']) ?>')">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
+                                <?php if (!empty($file['google_drive_web_link'])): ?>
+                                    <!-- Google Drive dosyası için butonlar -->
+                                    <a href="<?= htmlspecialchars($file['google_drive_web_link']) ?>" 
+                                       class="btn btn-success btn-sm" target="_blank">
+                                        <i class="fab fa-google-drive"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <!-- Local dosya için butonlar -->
+                                    <?php if (strpos($file['mime_type'], 'image/') === 0): ?>
+                                        <button class="btn btn-brown btn-sm" onclick="openImageModal('/uploads/<?= $file['event_id'] ?>/<?= $file['file_name'] ?>', '<?= htmlspecialchars($file['original_name']) ?>')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    <?php endif; ?>
+                                    <a href="/uploads/<?= $file['event_id'] ?>/<?= $file['file_name'] ?>" 
+                                       class="btn btn-success btn-sm" download>
+                                        <i class="fas fa-download"></i>
+                                    </a>
                                 <?php endif; ?>
-                                <a href="/uploads/<?= $file['event_id'] ?>/<?= $file['file_name'] ?>" 
-                                   class="btn btn-success btn-sm" download>
-                                    <i class="fas fa-download"></i>
-                                </a>
                                 <button class="btn btn-danger btn-sm" onclick="deleteFile('<?= $file['id'] ?>')">
                                     <i class="fas fa-trash"></i>
                                 </button>

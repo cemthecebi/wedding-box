@@ -5,14 +5,17 @@ namespace WeddingBox\Controllers;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use WeddingBox\Services\DatabaseService;
+use WeddingBox\Services\GoogleDriveService;
 
 class UploadController
 {
     private $db;
+    private $googleDrive;
     
     public function __construct(DatabaseService $db)
     {
         $this->db = $db;
+        $this->googleDrive = GoogleDriveService::getInstance();
     }
     
     /**
@@ -94,26 +97,79 @@ class UploadController
                     $extension = pathinfo($originalName, PATHINFO_EXTENSION);
                     $fileName = uniqid() . '_' . time() . '.' . $extension;
                     
-                    // Dosyayı kaydet
-                    $filePath = $uploadDir . '/' . $fileName;
-                    $file->moveTo($filePath);
-                    
-                    // Dosya bilgilerini al
-                    $fileSize = filesize($filePath);
-                    $mimeType = mime_content_type($filePath);
-                    
-                    // Veritabanına kayıt oluştur
                     // Uploader name kontrolü
                     $uploaderName = trim($_POST['uploaderName'] ?? '');
                     if (empty($uploaderName)) {
                         $uploaderName = 'Anonim Kullanıcı';
                     }
                     
+                    // Google Drive'a yükle
+                    $googleDriveFileId = null;
+                    $googleDriveWebLink = null;
+                    
+                    if ($event['google_drive_folder_id']) {
+                        try {
+                            // Event sahibinin Google token'ını al
+                            $eventOwner = $this->db->getUserById($event['user_id']);
+                            
+                            if (!empty($eventOwner['google_access_token'])) {
+                                $this->googleDrive->setAccessToken($eventOwner['google_access_token']);
+                                
+                                // Geçici dosya oluştur
+                                $tempFile = tempnam(sys_get_temp_dir(), 'upload_');
+                                $file->moveTo($tempFile);
+                                
+                                // Google Drive'a yükle
+                                $uploadResult = $this->googleDrive->uploadFile(
+                                    $tempFile,
+                                    $originalName,
+                                    $file->getClientMediaType(),
+                                    $event['google_drive_folder_id']
+                                );
+                                
+                                $googleDriveFileId = $uploadResult['id'];
+                                $googleDriveWebLink = $uploadResult['webViewLink'];
+                                
+                                // Geçici dosyayı sil
+                                unlink($tempFile);
+                            } else {
+                                throw new \Exception('Event sahibinin Google Drive bağlantısı yok');
+                            }
+                            
+                        } catch (\Exception $e) {
+                            // Google Drive yükleme başarısız olursa local'e yükle
+                            $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
+                            if (!is_dir($uploadDir)) {
+                                mkdir($uploadDir, 0755, true);
+                            }
+                            
+                            $fileName = uniqid() . '_' . time() . '.' . pathinfo($originalName, PATHINFO_EXTENSION);
+                            $filePath = $uploadDir . '/' . $fileName;
+                            $file->moveTo($filePath);
+                        }
+                    } else {
+                        // Google Drive bağlı değilse local'e yükle
+                        $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
+                        if (!is_dir($uploadDir)) {
+                            mkdir($uploadDir, 0755, true);
+                        }
+                        
+                        $fileName = uniqid() . '_' . time() . '.' . pathinfo($originalName, PATHINFO_EXTENSION);
+                        $filePath = $uploadDir . '/' . $fileName;
+                        $file->moveTo($filePath);
+                    }
+                    
+                    // Dosya bilgilerini al
+                    $fileSize = $file->getSize();
+                    $mimeType = $file->getClientMediaType();
+                    
                     $fileData = [
                         'originalName' => $originalName,
-                        'fileName' => $fileName,
+                        'fileName' => $fileName ?? $originalName,
                         'fileSize' => $fileSize,
                         'mimeType' => $mimeType,
+                        'googleDriveFileId' => $googleDriveFileId,
+                        'googleDriveWebLink' => $googleDriveWebLink,
                         'uploaderName' => $uploaderName,
                         'uploaderEmail' => $_POST['uploaderEmail'] ?? '',
                         'uploadIp' => $_SERVER['REMOTE_ADDR'] ?? '',

@@ -4,13 +4,14 @@
     "type": "project",
     "require": {
         "php": ">=8.0",
-        "slim/slim": "^4.0",
-        "slim/psr7": "^1.6",
-        "php-di/php-di": "^7.0",
-        "slim/php-view": "^3.0",
         "ext-pdo": "*",
         "ext-pdo_mysql": "*",
         "endroid/qr-code": "^4.0",
+        "google/apiclient": "^2.18",
+        "php-di/php-di": "^7.0",
+        "slim/php-view": "^3.0",
+        "slim/psr7": "^1.6",
+        "slim/slim": "^4.0",
         "vlucas/phpdotenv": "^5.0"
     },
     "require-dev": {
@@ -38,4 +39,4 @@
     },
     "minimum-stability": "stable",
     "prefer-stable": true
-} 
+}

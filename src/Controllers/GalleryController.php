@@ -5,14 +5,17 @@ namespace WeddingBox\Controllers;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use WeddingBox\Services\DatabaseService;
+use WeddingBox\Services\GoogleDriveService;
 
 class GalleryController
 {
     private $db;
+    private $googleDrive;
     
     public function __construct(DatabaseService $db)
     {
         $this->db = $db;
+        $this->googleDrive = GoogleDriveService::getInstance();
     }
     
     /**
@@ -39,11 +42,26 @@ class GalleryController
             $files = $this->db->getEventFiles($eventId);
             $uploaders = $this->db->getEventUploaders($eventId);
             
+            // Google Drive klasör linkini al
+            $googleDriveLink = null;
+            if (!empty($event['google_drive_folder_id'])) {
+                try {
+                    $user = $this->db->getUserById($event['user_id']);
+                    if (!empty($user['google_access_token'])) {
+                        $this->googleDrive->setAccessToken($user['google_access_token']);
+                        $googleDriveLink = $this->googleDrive->getFolderShareLink($event['google_drive_folder_id']);
+                    }
+                } catch (\Exception $e) {
+                    // Google Drive link alınamazsa null kalır
+                }
+            }
+            
             return $this->render($response, 'dashboard/gallery.php', [
                 'title' => 'Galeri - ' . $event['name'],
                 'event' => $event,
                 'files' => $files,
-                'uploaders' => $uploaders
+                'uploaders' => $uploaders,
+                'googleDriveLink' => $googleDriveLink
             ]);
             
         } catch (\Exception $e) {

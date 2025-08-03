@@ -7,9 +7,14 @@
                 <h1 class="h3 mb-0 text-brown">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
                 </h1>
-                <button class="btn btn-cta" data-bs-toggle="modal" data-bs-target="#createEventModal">
-                    <i class="fas fa-plus"></i> Yeni Etkinlik →
-                </button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" id="googleDriveBtn">
+                        <i class="fab fa-google-drive"></i> Google Drive Bağla
+                    </button>
+                    <button class="btn btn-cta" data-bs-toggle="modal" data-bs-target="#createEventModal">
+                        <i class="fas fa-plus"></i> Yeni Etkinlik →
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -103,6 +108,21 @@
                     <div class="mb-3">
                         <label for="eventDescription" class="form-label">Açıklama (Opsiyonel)</label>
                         <textarea class="form-control" id="eventDescription" name="description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3" id="googleDriveSection" style="display: none;">
+                        <label class="form-label">
+                            <i class="fab fa-google-drive"></i> Google Drive Klasörü
+                        </label>
+                        <div class="d-flex gap-2">
+                            <select class="form-control" id="googleDriveFolder" name="google_drive_folder_id">
+                                <option value="">Klasör Seçin...</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-primary" id="refreshFoldersBtn">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Dosyalar bu klasöre yüklenecek</small>
                     </div>
                 </div>
                 <div class="modal-footer">

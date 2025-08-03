@@ -5,16 +5,19 @@ namespace WeddingBox\Controllers;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use WeddingBox\Services\DatabaseService;
+use WeddingBox\Services\GoogleDriveService;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
 
 class EventController
 {
     private $db;
+    private $googleDrive;
     
     public function __construct(DatabaseService $db)
     {
         $this->db = $db;
+        $this->googleDrive = GoogleDriveService::getInstance();
     }
     
     /**
@@ -105,18 +108,44 @@ class EventController
                 throw new \Exception('Etkinlik adı ve tarihi gerekli');
             }
             
+            // Önce event'i oluştur
             $eventData = [
                 'name' => $eventName,
                 'date' => $eventDate,
-                'description' => $description
+                'description' => $description,
+                'google_drive_folder_id' => null
             ];
             
             $eventId = $this->db->createEvent($userId, $eventData);
             
-            // Upload klasörü oluştur
-            $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
+            // Google Drive klasörü oluştur (eğer kullanıcı Google'a bağlıysa)
+            $googleDriveFolderId = null;
+            $user = $this->db->getUserById($userId);
+            
+            if (!empty($user['google_access_token'])) {
+                try {
+                    $this->googleDrive->setAccessToken($user['google_access_token']);
+                    $googleDriveFolderId = $this->googleDrive->createEventFolder($eventName, $eventId);
+                    
+                    // Google Drive klasör ID'sini güncelle
+                    if ($googleDriveFolderId) {
+                        $this->db->updateEventGoogleFolder($eventId, $googleDriveFolderId);
+                    }
+                } catch (\Exception $e) {
+                    // Google Drive hatası durumunda local klasör oluştur
+                    $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+                }
+            }
+            
+            // Google Drive bağlı değilse local klasör oluştur
+            if (!$googleDriveFolderId) {
+                $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                }
             }
             
             $response->getBody()->write(json_encode([

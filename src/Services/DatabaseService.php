@@ -70,6 +70,86 @@ class DatabaseService
     }
     
     /**
+     * Google ile kullanıcı oluştur
+     */
+    public function createGoogleUser(string $email, string $displayName, string $googleId, string $accessToken, string $refreshToken = null): int
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                INSERT INTO users (email, display_name, google_id, google_access_token, google_refresh_token) 
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            
+            $stmt->execute([$email, $displayName, $googleId, $accessToken, $refreshToken]);
+            return (int) $this->pdo->lastInsertId();
+            
+        } catch (PDOException $e) {
+            if ($e->getCode() == 23000) { // Duplicate entry
+                throw new \Exception('Bu e-posta adresi zaten kullanılıyor');
+            }
+            throw new \Exception('Kullanıcı oluşturulamadı: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Google ID ile kullanıcı bul
+     */
+    public function getUserByGoogleId(string $googleId): ?array
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT * FROM users WHERE google_id = ?
+            ");
+            
+            $stmt->execute([$googleId]);
+            $user = $stmt->fetch();
+            
+            return $user ?: null;
+            
+        } catch (PDOException $e) {
+            throw new \Exception('Kullanıcı bulunamadı: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Kullanıcının Google token'ını güncelle
+     */
+    public function updateGoogleTokens(int $userId, string $accessToken, string $refreshToken = null): bool
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                UPDATE users 
+                SET google_access_token = ?, google_refresh_token = ?
+                WHERE id = ?
+            ");
+            
+            return $stmt->execute([$accessToken, $refreshToken, $userId]);
+            
+        } catch (PDOException $e) {
+            throw new \Exception('Token güncellenemedi: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Kullanıcının Google bilgilerini güncelle
+     */
+    public function updateGoogleInfo(int $userId, string $googleId, string $accessToken, string $refreshToken = null): bool
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                UPDATE users 
+                SET google_id = ?, google_access_token = ?, google_refresh_token = ?
+                WHERE id = ?
+            ");
+            
+            return $stmt->execute([$googleId, $accessToken, $refreshToken, $userId]);
+            
+        } catch (PDOException $e) {
+            throw new \Exception('Google bilgileri güncellenemedi: ' . $e->getMessage());
+        }
+    }
+    
+    /**
      * E-posta ile kullanıcı bul
      */
     public function getUserByEmail(string $email): ?array
@@ -118,8 +198,8 @@ class DatabaseService
             $eventId = uniqid('event_', true);
             
             $stmt = $this->pdo->prepare("
-                INSERT INTO events (id, user_id, name, date, description) 
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO events (id, user_id, name, date, description, google_drive_folder_id) 
+                VALUES (?, ?, ?, ?, ?, ?)
             ");
             
             $stmt->execute([
@@ -127,13 +207,33 @@ class DatabaseService
                 $userId,
                 $eventData['name'],
                 $eventData['date'],
-                $eventData['description'] ?? null
+                $eventData['description'] ?? null,
+                $eventData['google_drive_folder_id'] ?? null
             ]);
             
             return $eventId;
             
         } catch (PDOException $e) {
             throw new \Exception('Etkinlik oluşturulamadı: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Event'in Google Drive klasör ID'sini güncelle
+     */
+    public function updateEventGoogleFolder(string $eventId, string $googleDriveFolderId): bool
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                UPDATE events 
+                SET google_drive_folder_id = ?
+                WHERE id = ?
+            ");
+            
+            return $stmt->execute([$googleDriveFolderId, $eventId]);
+            
+        } catch (PDOException $e) {
+            throw new \Exception('Google Drive klasör ID güncellenemedi: ' . $e->getMessage());
         }
     }
     
@@ -250,8 +350,8 @@ class DatabaseService
             $fileId = uniqid('file_', true);
             
             $stmt = $this->pdo->prepare("
-                INSERT INTO files (id, event_id, original_name, file_name, file_size, mime_type, uploader_name, uploader_email, upload_ip, user_agent) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO files (id, event_id, original_name, file_name, file_size, mime_type, google_drive_file_id, google_drive_web_link, uploader_name, uploader_email, upload_ip, user_agent) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             
             $stmt->execute([
@@ -261,6 +361,8 @@ class DatabaseService
                 $fileData['fileName'],
                 $fileData['fileSize'],
                 $fileData['mimeType'],
+                $fileData['googleDriveFileId'] ?? null,
+                $fileData['googleDriveWebLink'] ?? null,
                 $fileData['uploaderName'] ?? 'Anonim',
                 $fileData['uploaderEmail'] ?? null,
                 $fileData['uploadIp'] ?? null,

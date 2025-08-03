@@ -490,8 +490,164 @@ function openImageModal(imageUrl, imageName) {
     });
 }
 
+/**
+ * Google Drive bağlantısını başlat
+ */
+async function connectGoogleDrive() {
+    try {
+        const response = await fetch('/auth/google', {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            window.location.href = result.auth_url;
+        } else {
+            throw new Error(result.error);
+        }
+        
+    } catch (error) {
+        console.error('Google Drive connection error:', error);
+        showAlert('Google Drive bağlantısı başlatılamadı: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Google Drive bağlantısını kaldır
+ */
+async function disconnectGoogleDrive() {
+    try {
+        const response = await fetch('/auth/google/disconnect', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(result.message, 'success');
+            updateGoogleDriveButton(false);
+        } else {
+            throw new Error(result.error);
+        }
+        
+    } catch (error) {
+        console.error('Google Drive disconnection error:', error);
+        showAlert('Google Drive bağlantısı kaldırılamadı: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Google Drive bağlantı durumunu kontrol et
+ */
+async function checkGoogleDriveStatus() {
+    try {
+        const response = await fetch('/auth/google/status', {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            updateGoogleDriveButton(result.connected);
+        }
+        
+    } catch (error) {
+        console.error('Google Drive status check error:', error);
+    }
+}
+
+/**
+ * Google Drive butonunu güncelle
+ */
+function updateGoogleDriveButton(connected) {
+    const btn = document.getElementById('googleDriveBtn');
+    if (btn) {
+        if (connected) {
+            btn.innerHTML = '<i class="fab fa-google-drive"></i> Google Drive Bağlı';
+            btn.className = 'btn btn-success';
+            btn.onclick = disconnectGoogleDrive;
+        } else {
+            btn.innerHTML = '<i class="fab fa-google-drive"></i> Google Drive Bağla';
+            btn.className = 'btn btn-outline-primary';
+            btn.onclick = connectGoogleDrive;
+        }
+    }
+}
+
+/**
+ * Google Drive klasörlerini getir
+ */
+async function loadGoogleDriveFolders() {
+    try {
+        const response = await fetch('/auth/google/folders', {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const select = document.getElementById('googleDriveFolder');
+            select.innerHTML = '<option value="">Klasör Seçin...</option>';
+            
+            result.folders.forEach(folder => {
+                const option = document.createElement('option');
+                option.value = folder.id;
+                option.textContent = folder.name;
+                select.appendChild(option);
+            });
+            
+            // Google Drive section'ı göster
+            document.getElementById('googleDriveSection').style.display = 'block';
+        }
+        
+    } catch (error) {
+        console.error('Google Drive folders error:', error);
+    }
+}
+
+/**
+ * Event oluşturma modal'ını güncelle
+ */
+function updateEventModal() {
+    const modal = document.getElementById('createEventModal');
+    if (modal) {
+        // Google Drive bağlı mı kontrol et
+        checkGoogleDriveStatus().then(connected => {
+            if (connected) {
+                loadGoogleDriveFolders();
+            }
+        });
+    }
+}
+
 // Initialize event listeners when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     console.log('App.js loaded, setting up event listeners');
     setupEventListeners();
+    
+    // Check Google Drive status if on dashboard
+    if (window.location.pathname === '/dashboard') {
+        checkGoogleDriveStatus();
+        
+        // Event modal açıldığında Google Drive kontrolü yap
+        const createEventModal = document.getElementById('createEventModal');
+        if (createEventModal) {
+            createEventModal.addEventListener('show.bs.modal', function() {
+                updateEventModal();
+            });
+        }
+    }
 }); 

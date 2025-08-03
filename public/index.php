@@ -29,6 +29,7 @@ use WeddingBox\Controllers\AuthController;
 use WeddingBox\Controllers\EventController;
 use WeddingBox\Controllers\UploadController;
 use WeddingBox\Controllers\GalleryController;
+use WeddingBox\Controllers\GoogleAuthController;
 use WeddingBox\Middleware\AuthMiddleware;
 use WeddingBox\Services\DatabaseService;
 
@@ -81,6 +82,13 @@ $app->group('/auth', function ($group) {
     $group->get('/register', [AuthController::class, 'showRegister']);
     $group->post('/register', [AuthController::class, 'register']);
     $group->get('/logout', [AuthController::class, 'logout']);
+    
+    // Google OAuth routes
+    $group->get('/google', [GoogleAuthController::class, 'startAuth']);
+    $group->get('/google/callback', [GoogleAuthController::class, 'handleCallback']);
+    $group->post('/google/disconnect', [GoogleAuthController::class, 'disconnect']);
+    $group->get('/google/status', [GoogleAuthController::class, 'checkConnection']);
+    $group->get('/google/folders', [GoogleAuthController::class, 'listFolders']);
 });
 
 // Dashboard routes (auth gerekli)
