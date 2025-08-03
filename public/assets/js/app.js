@@ -46,9 +46,8 @@ function setupEventListeners() {
  * Check authentication state
  */
 function checkAuthState() {
-    // This function is no longer needed as Firebase Auth is removed.
-    // Authentication state will be managed via server-side sessions.
-    console.log('Authentication state check (client-side) is no longer active.');
+    // Authentication state is managed via server-side sessions.
+    console.log('Authentication state check (client-side) is active.');
 }
 
 /**

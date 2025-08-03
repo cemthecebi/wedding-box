@@ -34,7 +34,7 @@ Misafir yükleme sayfasında:
 
 Arka planda yüklenen içerikler:
 - Sunucuda o etkinliğe ait özel klasöre kaydedilir,
-- Firebase veritabanına yüklemeye dair bilgi (kim yükledi, ne zaman, hangi dosya) eklenir.
+- Veritabanına yüklemeye dair bilgi (kim yükledi, ne zaman, hangi dosya) eklenir.
 
 Bu sayede sistemde hem medya dosyası hem de içerik geçmişi eksiksiz şekilde tutulmuş olur.
 
@@ -53,7 +53,7 @@ Sistem, yüklenen içeriklerin kötüye kullanımını engellemek için bazı ö
 - Yalnızca belirli dosya türlerine (örneğin JPEG, PNG, MP4) izin verilir,
 - Dosya boyutu sınırlaması getirilir,
 - Sistem yöneticisi uygun görmediği içerikleri silebilir,
-- Firebase üzerinden yükleme geçmişi takip edilebilir.
+- Veritabanı üzerinden yükleme geçmişi takip edilebilir.
 
 Etkinlik bağlantıları ve QR kodlar, sadece paylaşıldığı kişiler tarafından erişilebildiğinden içerik gizliliği korunur.
 
@@ -67,8 +67,8 @@ Etkinlik oluşturmak, bağlantı paylaşmak ve içerik toplamak sadece birkaç d
 
 - **Backend**: PHP 8.0+, Slim Framework 4
 - **Frontend**: HTML5, CSS3, JavaScript (ES6+), Bootstrap 5
-- **Veritabanı**: Firebase Firestore/Realtime Database
-- **Kimlik Doğrulama**: Firebase Auth
+- **Veritabanı**: MySQL
+- **Kimlik Doğrulama**: PHP Session-based Auth
 - **Dosya Depolama**: Sunucu klasör sistemi
 - **QR Kod**: qrcode.js kütüphanesi
 

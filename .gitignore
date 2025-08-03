@@ -7,9 +7,7 @@
 .env.local
 .env.production
 
-# Firebase config
-firebase-config.json
-firebase-service-account.json
+
 
 # Uploads (git'e dahil edilmemeli)
 /uploads/

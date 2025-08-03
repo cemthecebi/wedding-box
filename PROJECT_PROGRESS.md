@@ -4,7 +4,7 @@
 
 ### ✅ Yapılanlar
 - [x] Proje tanımlaması ve gereksinim analizi
-- [x] Teknoloji stack'i belirlendi (PHP, Firebase, HTML/JS)
+- [x] Teknoloji stack'i belirlendi (PHP, MySQL, HTML/JS)
 - [x] Kullanıcı akışı (UI/UX workflow) tasarlandı
 - [x] Teknik iş akışı (Backend & Storage) planlandı
 - [x] Güvenlik ve yetki gereksinimleri belirlendi
@@ -13,7 +13,7 @@
 - [x] .htaccess dosyasının oluşturulması (güvenlik)
 - [x] .gitignore dosyasının hazırlanması
 - [x] Ana giriş dosyası (public/index.php) oluşturuldu
-- [x] Firebase servis sınıfı oluşturuldu
+- [x] Database servis sınıfı oluşturuldu
 - [x] Controller sınıfları oluşturuldu (Auth, Event, Upload, Gallery)
 - [x] Auth middleware oluşturuldu
 - [x] Ana layout template oluşturuldu
@@ -21,7 +21,7 @@
 - [x] CSS stilleri oluşturuldu
 - [x] JavaScript fonksiyonları oluşturuldu
 - [x] Environment değişkenleri örnek dosyası oluşturuldu
-- [x] Firebase konfigürasyon örnek dosyası oluşturuldu
+- [x] Database konfigürasyon dosyası oluşturuldu
 - [x] MySQL veritabanı şeması oluşturuldu
 - [x] DatabaseService sınıfı oluşturuldu (MySQL entegrasyonu)
 - [x] Tüm controller'lar MySQL için güncellendi
@@ -50,11 +50,11 @@
 - [x] .htaccess dosyasının oluşturulması (güvenlik)
 - [x] .gitignore dosyasının hazırlanması
 
-#### 2. Firebase Konfigürasyonu
-- [ ] Firebase projesinin oluşturulması
-- [ ] Firebase SDK'nın entegrasyonu
-- [ ] Firebase Auth konfigürasyonu
-- [ ] Firestore/Realtime Database kurallarının yazılması
+#### 2. Database Konfigürasyonu
+- [x] MySQL veritabanı kurulumu
+- [x] Database şeması oluşturuldu
+- [x] Stored procedure'lar oluşturuldu
+- [x] Database bağlantısı test edildi
 
 #### 3. Backend Geliştirme (PHP)
 - [x] Slim Framework kurulumu (composer.json'da tanımlandı)
@@ -98,8 +98,8 @@
 #### Kullanılacak Teknolojiler
 - **Backend**: PHP 8.0+, Slim Framework 4
 - **Frontend**: HTML5, CSS3, JavaScript (ES6+), Bootstrap 5
-- **Veritabanı**: Firebase Firestore/Realtime Database
-- **Kimlik Doğrulama**: Firebase Auth
+- **Veritabanı**: MySQL
+- **Kimlik Doğrulama**: PHP Session-based Auth
 - **Dosya Depolama**: Sunucu klasör sistemi
 - **QR Kod**: qrcode.js kütüphanesi
 
@@ -119,7 +119,7 @@
 - Intuitive navigation
 
 ### 🔒 Güvenlik Önlemleri
-- Firebase güvenlik kuralları
+- Database güvenlik kuralları
 - Dosya tipi kontrolü
 - Dosya boyutu sınırlaması
 - CORS politikaları
