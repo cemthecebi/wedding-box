@@ -145,10 +145,24 @@ class AuthController
             // Veritabanında kullanıcı oluştur
             $userId = $this->db->createUser($email, $passwordHash, $displayName);
             
+            // Session ayarlarını yapılandır (daha uzun süre açık kalması için)
+            ini_set('session.gc_maxlifetime', 86400); // 24 saat
+            ini_set('session.cookie_lifetime', 86400); // 24 saat
+            ini_set('session.cookie_secure', 0); // HTTP için
+            ini_set('session.cookie_httponly', 1); // XSS koruması
+            ini_set('session.use_strict_mode', 1); // Güvenlik
+            
+            // Session'a kullanıcı bilgilerini kaydet (otomatik login)
+            session_start();
+            $_SESSION['user_id'] = $userId;
+            $_SESSION['email'] = $email;
+            $_SESSION['display_name'] = $displayName;
+            $_SESSION['login_time'] = time(); // Giriş zamanını kaydet
+            
             $response->getBody()->write(json_encode([
                 'success' => true,
-                'message' => 'Kayıt başarılı! Giriş yapabilirsiniz.',
-                'redirect' => '/auth/login'
+                'message' => 'Kayıt başarılı! Hoş geldiniz.',
+                'redirect' => '/dashboard'
             ]));
             return $response->withHeader('Content-Type', 'application/json');
             
