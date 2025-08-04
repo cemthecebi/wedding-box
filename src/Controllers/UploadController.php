@@ -81,12 +81,6 @@ class UploadController
             $uploadedCount = 0;
             $errors = [];
             
-            // Upload klasörünü kontrol et/oluştur
-            $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-            
             foreach ($files as $file) {
                 try {
                     // Dosya validasyonu
@@ -109,54 +103,54 @@ class UploadController
                     
                     if ($event['google_drive_folder_id']) {
                         try {
-                            // Event sahibinin Google token'ını al
+                            // Event sahibinin Google token bilgilerini al
                             $eventOwner = $this->db->getUserById($event['user_id']);
                             
-                            if (!empty($eventOwner['google_access_token'])) {
-                                $this->googleDrive->setAccessToken($eventOwner['google_access_token']);
-                                
-                                // Geçici dosya oluştur
-                                $tempFile = tempnam(sys_get_temp_dir(), 'upload_');
-                                $file->moveTo($tempFile);
-                                
-                                // Google Drive'a yükle
-                                $uploadResult = $this->googleDrive->uploadFile(
-                                    $tempFile,
-                                    $originalName,
-                                    $file->getClientMediaType(),
-                                    $event['google_drive_folder_id']
-                                );
-                                
-                                $googleDriveFileId = $uploadResult['id'];
-                                $googleDriveWebLink = $uploadResult['webViewLink'];
-                                
-                                // Geçici dosyayı sil
-                                unlink($tempFile);
-                            } else {
+                            if (!$eventOwner || empty($eventOwner['google_access_token'])) {
                                 throw new \Exception('Event sahibinin Google Drive bağlantısı yok');
                             }
                             
-                        } catch (\Exception $e) {
-                            // Google Drive yükleme başarısız olursa local'e yükle
-                            $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
-                            if (!is_dir($uploadDir)) {
-                                mkdir($uploadDir, 0755, true);
+                            // Token'ı yenilemeyi dene
+                            $refreshedToken = $this->googleDrive->refreshTokenIfNeeded(
+                                $eventOwner['google_access_token'],
+                                $eventOwner['google_refresh_token']
+                            );
+                            
+                            // Eğer token yenilendiyse veritabanını güncelle
+                            if ($refreshedToken['access_token'] !== $eventOwner['google_access_token']) {
+                                $this->db->updateGoogleTokens(
+                                    $event['user_id'],
+                                    $refreshedToken['access_token'],
+                                    $refreshedToken['refresh_token'],
+                                    $refreshedToken['expires_in']
+                                );
                             }
                             
-                            $fileName = uniqid() . '_' . time() . '.' . pathinfo($originalName, PATHINFO_EXTENSION);
-                            $filePath = $uploadDir . '/' . $fileName;
-                            $file->moveTo($filePath);
+                            $this->googleDrive->setAccessToken($refreshedToken['access_token']);
+                            
+                            // Geçici dosya oluştur
+                            $tempFile = tempnam(sys_get_temp_dir(), 'upload_');
+                            $file->moveTo($tempFile);
+                            
+                            // Google Drive'a yükle
+                            $uploadResult = $this->googleDrive->uploadFile(
+                                $tempFile,
+                                $originalName,
+                                $file->getClientMediaType(),
+                                $event['google_drive_folder_id']
+                            );
+                            
+                            $googleDriveFileId = $uploadResult['id'];
+                            $googleDriveWebLink = $uploadResult['webViewLink'];
+                            
+                            // Geçici dosyayı sil
+                            unlink($tempFile);
+                            
+                        } catch (\Exception $e) {
+                            throw new \Exception('Google Drive yükleme başarısız: ' . $e->getMessage());
                         }
                     } else {
-                        // Google Drive bağlı değilse local'e yükle
-                        $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
-                        if (!is_dir($uploadDir)) {
-                            mkdir($uploadDir, 0755, true);
-                        }
-                        
-                        $fileName = uniqid() . '_' . time() . '.' . pathinfo($originalName, PATHINFO_EXTENSION);
-                        $filePath = $uploadDir . '/' . $fileName;
-                        $file->moveTo($filePath);
+                        throw new \Exception('Bu etkinlik için Google Drive bağlantısı kurulmamış. Lütfen etkinlik sahibi ile iletişime geçin.');
                     }
                     
                     // Dosya bilgilerini al

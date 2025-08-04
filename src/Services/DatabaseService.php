@@ -114,19 +114,51 @@ class DatabaseService
     /**
      * Kullanıcının Google token'ını güncelle
      */
-    public function updateGoogleTokens(int $userId, string $accessToken, string $refreshToken = null): bool
+    public function updateGoogleTokens(int $userId, string $accessToken, string $refreshToken = null, int $expiresIn = 3600): bool
     {
         try {
+            $expiresAt = date('Y-m-d H:i:s', time() + $expiresIn);
+            
             $stmt = $this->pdo->prepare("
                 UPDATE users 
-                SET google_access_token = ?, google_refresh_token = ?
+                SET google_access_token = ?, google_refresh_token = ?, google_token_expires_at = ?
                 WHERE id = ?
             ");
             
-            return $stmt->execute([$accessToken, $refreshToken, $userId]);
+            return $stmt->execute([$accessToken, $refreshToken, $expiresAt, $userId]);
             
         } catch (PDOException $e) {
             throw new \Exception('Token güncellenemedi: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Kullanıcının Google token bilgilerini al (süre kontrolü yapmaz)
+     */
+    public function getGoogleTokenInfo(int $userId): ?array
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT google_access_token, google_refresh_token, google_token_expires_at
+                FROM users 
+                WHERE id = ? AND google_access_token IS NOT NULL
+            ");
+            
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch();
+            
+            if (!$user) {
+                return null;
+            }
+            
+            return [
+                'access_token' => $user['google_access_token'],
+                'refresh_token' => $user['google_refresh_token'],
+                'expires_at' => $user['google_token_expires_at']
+            ];
+            
+        } catch (PDOException $e) {
+            throw new \Exception('Token bilgileri alınamadı: ' . $e->getMessage());
         }
     }
     

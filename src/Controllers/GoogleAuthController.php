@@ -70,6 +70,15 @@ class GoogleAuthController
                 throw new \Exception('Bu e-posta adresi ile kayıtlı kullanıcı bulunamadı. Önce normal kayıt yapmalısınız.');
             } else {
                 // Mevcut kullanıcının Google bilgilerini güncelle
+                $expiresIn = $token['expires_in'] ?? 3600;
+                $this->db->updateGoogleTokens(
+                    $user['id'],
+                    $token['access_token'],
+                    $token['refresh_token'] ?? null,
+                    $expiresIn
+                );
+                
+                // Google ID'yi de güncelle
                 $this->db->updateGoogleInfo(
                     $user['id'],
                     $userInfo['id'],

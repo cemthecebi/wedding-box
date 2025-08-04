@@ -118,34 +118,42 @@ class EventController
             
             $eventId = $this->db->createEvent($userId, $eventData);
             
-            // Google Drive klasörü oluştur (eğer kullanıcı Google'a bağlıysa)
+            // Google Drive klasörü oluştur (kullanıcı Google'a bağlı olmalı)
             $googleDriveFolderId = null;
+            
+            // Önce kullanıcının Google token bilgilerini al
             $user = $this->db->getUserById($userId);
             
-            if (!empty($user['google_access_token'])) {
-                try {
-                    $this->googleDrive->setAccessToken($user['google_access_token']);
-                    $googleDriveFolderId = $this->googleDrive->createEventFolder($eventName, $eventId);
-                    
-                    // Google Drive klasör ID'sini güncelle
-                    if ($googleDriveFolderId) {
-                        $this->db->updateEventGoogleFolder($eventId, $googleDriveFolderId);
-                    }
-                } catch (\Exception $e) {
-                    // Google Drive hatası durumunda local klasör oluştur
-                    $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
-                    if (!is_dir($uploadDir)) {
-                        mkdir($uploadDir, 0755, true);
-                    }
-                }
+            if (!$user || empty($user['google_access_token'])) {
+                throw new \Exception('Etkinlik oluşturmak için Google Drive bağlantısı gereklidir. Lütfen önce Google hesabınızı bağlayın.');
             }
             
-            // Google Drive bağlı değilse local klasör oluştur
-            if (!$googleDriveFolderId) {
-                $uploadDir = __DIR__ . '/../../uploads/' . $eventId;
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0755, true);
+            // Token'ı yenilemeyi dene
+            try {
+                $refreshedToken = $this->googleDrive->refreshTokenIfNeeded(
+                    $user['google_access_token'],
+                    $user['google_refresh_token']
+                );
+                
+                // Eğer token yenilendiyse veritabanını güncelle
+                if ($refreshedToken['access_token'] !== $user['google_access_token']) {
+                    $this->db->updateGoogleTokens(
+                        $userId,
+                        $refreshedToken['access_token'],
+                        $refreshedToken['refresh_token'],
+                        $refreshedToken['expires_in']
+                    );
                 }
+                
+                $this->googleDrive->setAccessToken($refreshedToken['access_token']);
+                $googleDriveFolderId = $this->googleDrive->createEventFolder($eventName, $eventId);
+                
+                // Google Drive klasör ID'sini güncelle
+                if ($googleDriveFolderId) {
+                    $this->db->updateEventGoogleFolder($eventId, $googleDriveFolderId);
+                }
+            } catch (\Exception $e) {
+                throw new \Exception('Google Drive klasörü oluşturulamadı: ' . $e->getMessage());
             }
             
             $response->getBody()->write(json_encode([

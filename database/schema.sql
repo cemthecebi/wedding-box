@@ -11,9 +11,14 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     display_name VARCHAR(255) NOT NULL,
+    google_id VARCHAR(255) NULL,
+    google_access_token TEXT NULL,
+    google_refresh_token TEXT NULL,
+    google_token_expires_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_email (email),
+    INDEX idx_google_id (google_id),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -26,13 +31,15 @@ CREATE TABLE events (
     description TEXT,
     status ENUM('active', 'inactive') DEFAULT 'active',
     gallery_public BOOLEAN DEFAULT FALSE,
+    google_drive_folder_id VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
     INDEX idx_date (date),
     INDEX idx_status (status),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_google_drive_folder_id (google_drive_folder_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Files table
@@ -47,11 +54,14 @@ CREATE TABLE files (
     uploader_email VARCHAR(255),
     upload_ip VARCHAR(45),
     user_agent TEXT,
+    google_drive_file_id VARCHAR(255) NULL,
+    google_drive_web_link TEXT NULL,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
     INDEX idx_event_id (event_id),
     INDEX idx_uploaded_at (uploaded_at),
-    INDEX idx_mime_type (mime_type)
+    INDEX idx_mime_type (mime_type),
+    INDEX idx_google_drive_file_id (google_drive_file_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Sessions table (for PHP sessions)

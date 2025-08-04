@@ -46,9 +46,25 @@ class GalleryController
             $googleDriveLink = null;
             if (!empty($event['google_drive_folder_id'])) {
                 try {
-                    $user = $this->db->getUserById($event['user_id']);
-                    if (!empty($user['google_access_token'])) {
-                        $this->googleDrive->setAccessToken($user['google_access_token']);
+                    $eventOwner = $this->db->getUserById($event['user_id']);
+                    if ($eventOwner && !empty($eventOwner['google_access_token'])) {
+                        // Token'ı yenilemeyi dene
+                        $refreshedToken = $this->googleDrive->refreshTokenIfNeeded(
+                            $eventOwner['google_access_token'],
+                            $eventOwner['google_refresh_token']
+                        );
+                        
+                        // Eğer token yenilendiyse veritabanını güncelle
+                        if ($refreshedToken['access_token'] !== $eventOwner['google_access_token']) {
+                            $this->db->updateGoogleTokens(
+                                $event['user_id'],
+                                $refreshedToken['access_token'],
+                                $refreshedToken['refresh_token'],
+                                $refreshedToken['expires_in']
+                            );
+                        }
+                        
+                        $this->googleDrive->setAccessToken($refreshedToken['access_token']);
                         $googleDriveLink = $this->googleDrive->getFolderShareLink($event['google_drive_folder_id']);
                     }
                 } catch (\Exception $e) {
@@ -95,10 +111,16 @@ class GalleryController
             
             $files = $this->db->getEventFiles($eventId);
             
-            // Dosya URL'lerini ekle
+            // Dosya URL'lerini ekle (Google Drive linklerini kullan)
             foreach ($files as &$file) {
-                $file['url'] = $_ENV['SITE_URL'] . '/uploads/' . $eventId . '/' . $file['fileName'];
-                $file['thumbnailUrl'] = $this->isImage($file['mimeType']) ? $file['url'] : null;
+                if (!empty($file['google_drive_web_link'])) {
+                    $file['url'] = $file['google_drive_web_link'];
+                    $file['thumbnailUrl'] = $this->isImage($file['mimeType']) ? $file['google_drive_web_link'] : null;
+                } else {
+                    // Eski dosyalar için fallback (artık kullanılmayacak)
+                    $file['url'] = $_ENV['SITE_URL'] . '/uploads/' . $eventId . '/' . $file['fileName'];
+                    $file['thumbnailUrl'] = $this->isImage($file['mimeType']) ? $file['url'] : null;
+                }
             }
             
             $response->getBody()->write(json_encode([
@@ -150,10 +172,37 @@ class GalleryController
                 return $response->withJson(['error' => 'Access denied'], 403);
             }
             
-            // Fiziksel dosyayı sil
-            $filePath = __DIR__ . '/../../uploads/' . $file['event_id'] . '/' . $file['file_name'];
-            if (file_exists($filePath)) {
-                unlink($filePath);
+            // Google Drive'dan dosyayı sil (eğer Google Drive dosyası ise)
+            if (!empty($file['google_drive_file_id'])) {
+                try {
+                    $eventOwner = $this->db->getUserById($event['user_id']);
+                    if ($eventOwner && !empty($eventOwner['google_access_token'])) {
+                        $refreshedToken = $this->googleDrive->refreshTokenIfNeeded(
+                            $eventOwner['google_access_token'],
+                            $eventOwner['google_refresh_token']
+                        );
+                        
+                        if ($refreshedToken['access_token'] !== $eventOwner['google_access_token']) {
+                            $this->db->updateGoogleTokens(
+                                $event['user_id'],
+                                $refreshedToken['access_token'],
+                                $refreshedToken['refresh_token'],
+                                $refreshedToken['expires_in']
+                            );
+                        }
+                        
+                        $this->googleDrive->setAccessToken($refreshedToken['access_token']);
+                        $this->googleDrive->deleteFile($file['google_drive_file_id']);
+                    }
+                } catch (\Exception $e) {
+                    // Google Drive silme başarısız olsa bile devam et
+                }
+            } else {
+                // Eski local dosyaları sil (artık kullanılmayacak)
+                $filePath = __DIR__ . '/../../uploads/' . $file['event_id'] . '/' . $file['file_name'];
+                if (file_exists($filePath)) {
+                    unlink($filePath);
+                }
             }
             
             // Veritabanından kaydı sil

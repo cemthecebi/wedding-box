@@ -76,6 +76,50 @@ class GoogleDriveService
     }
     
     /**
+     * Refresh token ile yeni access token al
+     */
+    public function refreshAccessToken(string $refreshToken): array
+    {
+        try {
+            $this->client->setRefreshToken($refreshToken);
+            $token = $this->client->fetchAccessTokenWithRefreshToken($refreshToken);
+            return $token;
+        } catch (Exception $e) {
+            throw new Exception('Token yenilenemedi: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Token'ı yenile ve yeni token'ı döndür
+     */
+    public function refreshTokenIfNeeded(string $accessToken, string $refreshToken = null): array
+    {
+        try {
+            $this->client->setAccessToken($accessToken);
+            
+            if ($this->client->isAccessTokenExpired() && $refreshToken) {
+                $newToken = $this->refreshAccessToken($refreshToken);
+                return [
+                    'access_token' => $newToken['access_token'],
+                    'refresh_token' => $refreshToken,
+                    'expires_in' => $newToken['expires_in'] ?? 3600,
+                    'token_type' => $newToken['token_type'] ?? 'Bearer'
+                ];
+            }
+            
+            return [
+                'access_token' => $accessToken,
+                'refresh_token' => $refreshToken,
+                'expires_in' => 3600,
+                'token_type' => 'Bearer'
+            ];
+            
+        } catch (Exception $e) {
+            throw new Exception('Token kontrolü başarısız: ' . $e->getMessage());
+        }
+    }
+    
+    /**
      * Kullanıcı bilgilerini al
      */
     public function getUserInfo(): array
