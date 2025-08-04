@@ -72,6 +72,85 @@ Etkinlik oluşturmak, bağlantı paylaşmak ve içerik toplamak sadece birkaç d
 - **Dosya Depolama**: Sunucu klasör sistemi
 - **QR Kod**: qrcode.js kütüphanesi
 
+## 🛠️ Local Kurulum
+
+### Gereksinimler
+- PHP 8.0 veya üzeri
+- MySQL 5.7 veya üzeri
+- Composer
+
+### Kurulum Adımları
+
+1. **Projeyi klonlayın**
+   ```bash
+   git clone [repository-url]
+   cd wedding-box
+   ```
+
+2. **Composer bağımlılıklarını yükleyin**
+   ```bash
+   composer install
+   ```
+
+3. **Environment dosyasını oluşturun**
+   ```bash
+   cp env.example .env
+   ```
+
+4. **Veritabanı ayarlarını yapılandırın**
+   
+   `.env` dosyasını düzenleyerek veritabanı bilgilerinizi girin:
+   ```env
+   DB_HOST=localhost
+   DB_NAME=wedding_box
+   DB_USER=root
+   DB_PASS=your_password
+   DB_PORT=3306
+   ```
+
+5. **Veritabanını oluşturun**
+   ```bash
+   mysql -u root -p
+   CREATE DATABASE wedding_box;
+   exit;
+   ```
+
+6. **Veritabanı şemasını yükleyin**
+   ```bash
+   mysql -u root -p wedding_box < database/schema.sql
+   ```
+
+7. **Uygulamayı başlatın**
+   ```bash
+   php -S localhost:8001 -t public
+   ```
+
+8. **Tarayıcınızda açın**
+   ```
+   http://localhost:8001
+   ```
+
+### Google OAuth Kurulumu (Opsiyonel)
+
+Google Drive entegrasyonu için:
+
+1. [Google Cloud Console](https://console.cloud.google.com/)'da yeni bir proje oluşturun
+2. Google Drive API'yi etkinleştirin
+3. OAuth 2.0 kimlik bilgilerini oluşturun
+4. `.env` dosyasına Google bilgilerinizi ekleyin:
+   ```env
+   GOOGLE_CLIENT_ID=your_client_id
+   GOOGLE_CLIENT_SECRET=your_client_secret
+   GOOGLE_REDIRECT_URI=http://localhost:8001/auth/google/callback
+   ```
+
+### Dosya İzinleri
+
+`uploads/` klasörünün yazılabilir olduğundan emin olun:
+```bash
+chmod 755 uploads/
+```
+
 ## 📋 Proje İlerleme
 
 Proje ilerleme durumu için [PROJECT_PROGRESS.md](./PROJECT_PROGRESS.md) dosyasını inceleyebilirsiniz.
